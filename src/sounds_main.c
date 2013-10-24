@@ -1,6 +1,7 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <avr/io.h>
+#include <avr/sleep.h>
 
 
 #ifdef PROGMEM 
@@ -11,23 +12,25 @@
 
 #define SOUND_FREQ 16000
 
-#define NUM_BUTTONS 4
-#define BTN_MASK ((1<<NUM_BUTTONS) - 1)
 
 static uint16_t g_curr_sound_len;
 static const /*PROGMEM*/ unsigned char* g_pgm_play_buff;
 static uint16_t g_play_buff_pos;
 
-static unsigned char g_btn_status;
 
 /* actual sounds */
 extern const PROGMEM unsigned char sound0[];
+extern const uint16_t sound0_len;
 extern const PROGMEM unsigned char sound1[];
+extern const uint16_t sound1_len;
 extern const PROGMEM unsigned char sound2[];
+extern const uint16_t sound2_len;
 extern const PROGMEM unsigned char sound3[];
+extern const uint16_t sound3_len;
 
-void setup();
-void loop();
+static void setup();
+static void loop();
+static void go_to_sleep();
 
 
 int main()
@@ -40,7 +43,7 @@ int main()
 }
 
 
-void sound_setup()
+static void sound_setup()
 {
   g_play_buff_pos = 0xffff;
 
@@ -92,52 +95,56 @@ void sound_setup()
   // interrupts disabled to be safe.
   OCR3A = (F_CPU / SOUND_FREQ);    // 8e6 / 16000 for atmega128
   
-  // Enable interrupt when TCNT3 == OCR3A
-  ETIMSK = _BV(OCIE3A);
   sei();
 }
 
 
-void setup()
+static void setup()
 {
   volatile unsigned char dummy;
 
   sound_setup();
 
-  /* set the pins and pull them up */
-  PORTC |= (PC0 | PC1 | PC2 | PC3); // pullup
-  DDRC = 0; // input
+  /* set the pins as inputs (don't pull them up) */
+  DDRD = 0; // input
+
+  /* set port D pins 0-3 to trigger interrupts */
+  EICRA = 0xff;
+  EIMSK = 0x0f;
 
   /* use some references to sound0/1/2/3 to keep them in the binary */
   dummy = sound0[0];
   //dummy = sound1[0];
   //dummy = sound2[0];
   //dummy = sound3[0];
-
-  g_btn_status = BTN_MASK;
 }
+
+
+static void go_to_sleep()
+{
+  // disable the timer interrupts
+  ETIMSK = 0;
+  // set sleep mode to POWER DOWN mode
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+  // go to sleep
+  sleep_cpu();
+}
+
+
+static void wake_up()
+{
+  // back from sleep
+  sleep_disable();
+  
+  // enable interrupt when TCNT3 == OCR3A
+  ETIMSK = _BV(OCIE3A);
+}
+
 
 void loop()
 {
-  unsigned char btn_status = (PINC & BTN_MASK);
-
-  if (g_play_buff_pos != 0xffff) return;
-
-  /* wait for a button to be pressed */
-  if (((btn_status & (1<<PINC0)) == 0) &&
-      ((g_btn_status & (1<<PINC0)) != 0))
-  {
-    // disable interrupts
-    cli();
-    
-    g_pgm_play_buff = sound0;
-    g_curr_sound_len = 30000;
-    g_play_buff_pos = 0;
-
-    sei();
-  }
-
-  g_btn_status = btn_status;
+  if (g_play_buff_pos == 0xffff) go_to_sleep();
 }
 
 
@@ -151,3 +158,16 @@ ISR(TIMER3_COMPA_vect)
     }
   }
 }
+
+
+ISR(INT0_vect)
+{
+  wake_up();
+
+  cli();
+  g_play_buff_pos = 0;
+  g_pgm_play_buff = sound0;
+  g_curr_sound_len = sound0_len;
+  sei();
+}
+
