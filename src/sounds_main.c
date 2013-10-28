@@ -45,7 +45,7 @@ int main()
 
 static void sound_setup()
 {
-  g_play_buff_pos = 0xffff;
+  g_play_buff_pos = 0xfffe;
 
   DDRB = 0xff; // set all port B pins as outputs
   
@@ -75,7 +75,7 @@ static void sound_setup()
   TCCR1B = (TCCR1B & ~(_BV(CS12) | _BV(CS11))) | _BV(CS10);
   
   // Set initial pulse width to the first sample.
-  OCR1A = 0x80;
+  OCR1A = 0;
   
   
   // Set up Timer 1 to send a sample every interrupt.
@@ -124,6 +124,10 @@ static void go_to_sleep()
 {
   // disable the timer interrupts
   ETIMSK = 0;
+
+  // clear the PWM output
+  OCR1A = 0;
+
   // set sleep mode to POWER DOWN mode
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
@@ -144,17 +148,20 @@ static void wake_up()
 
 void loop()
 {
-  if (g_play_buff_pos == 0xffff) go_to_sleep();
+  if (g_play_buff_pos == 0xfffe) {
+    g_play_buff_pos = 0xffff;
+    go_to_sleep();
+  }
 }
 
 
 ISR(TIMER3_COMPA_vect)
 {
-  if (g_play_buff_pos != 0xffff) {
+  if (g_play_buff_pos < 0xfff0) {
     OCR1A = pgm_read_byte_far((uint16_t)&g_pgm_play_buff[g_play_buff_pos]);
     g_play_buff_pos++;
     if (g_play_buff_pos == g_curr_sound_len) {
-      g_play_buff_pos = 0xffff;
+      g_play_buff_pos = 0xfffe;
     }
   }
 }
