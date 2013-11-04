@@ -3,7 +3,7 @@
 import sys
 
 
-WAVE_HEADER_SIZE = 0x2c
+WAV_HEADER_SIZE = 0x2c
 
 
 if len(sys.argv) < 2:
