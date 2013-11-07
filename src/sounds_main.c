@@ -13,25 +13,26 @@
 #define SOUND_FREQ 16000
 
 
-static uint16_t g_curr_sound_len;
-static const /*PROGMEM*/ unsigned char* g_pgm_play_buff;
-static uint16_t g_play_buff_pos;
+static uint32_t g_curr_sound_len;
+static uint32_t g_pgm_play_buff;
+volatile uint32_t g_play_buff_pos;
 
 
 /* actual sounds */
 extern const PROGMEM unsigned char sound0[];
-extern const uint16_t sound0_len;
+extern const uint32_t sound0_len;
 extern const PROGMEM unsigned char sound1[];
-extern const uint16_t sound1_len;
+extern const uint32_t sound1_len;
 extern const PROGMEM unsigned char sound2[];
-extern const uint16_t sound2_len;
+extern const uint32_t sound2_len;
 extern const PROGMEM unsigned char sound3[];
-extern const uint16_t sound3_len;
+extern const uint32_t sound3_len;
 
 static void setup();
 static void loop();
 static void go_to_sleep();
 
+static unsigned char g_sound_index;
 
 int main()
 {
@@ -45,7 +46,9 @@ int main()
 
 static void sound_setup()
 {
-  g_play_buff_pos = 0xfffe;
+  cli();
+  
+  g_play_buff_pos = 0xffff;
 
   DDRB = 0xff; // set all port B pins as outputs
   
@@ -80,8 +83,6 @@ static void sound_setup()
   
   // Set up Timer 1 to send a sample every interrupt.
   
-  cli();
-  
   // Set CTC mode (Clear Timer on Compare Match)
   // Have to set OCR3A *after*, otherwise it gets reset to 0!
   TCCR3B = (TCCR3B & ~_BV(WGM33)) | _BV(WGM32);
@@ -114,9 +115,11 @@ static void setup()
 
   /* use some references to sound0/1/2/3 to keep them in the binary */
   dummy = sound0[0];
-  //dummy = sound1[0];
-  //dummy = sound2[0];
-  //dummy = sound3[0];
+  dummy = sound1[0];
+  dummy = sound2[0];
+  dummy = sound3[0];
+
+  g_sound_index = 0;
 }
 
 
@@ -124,6 +127,11 @@ static void go_to_sleep()
 {
   // disable the timer interrupts
   ETIMSK = 0;
+
+  TCCR1A = 0;
+  TCCR1B = 0;
+  TCCR3A = 0;
+  TCCR3B = 0;
 
   // clear the PWM output
   OCR1A = 0;
@@ -139,8 +147,10 @@ static void go_to_sleep()
 static void wake_up()
 {
   // back from sleep
-  sleep_disable();
+  //sleep_disable();
   
+  sound_setup();
+
   // enable interrupt when TCNT3 == OCR3A
   ETIMSK = _BV(OCIE3A);
 }
@@ -148,8 +158,7 @@ static void wake_up()
 
 void loop()
 {
-  if (g_play_buff_pos == 0xfffe) {
-    g_play_buff_pos = 0xffff;
+  if (g_play_buff_pos == 0xffff) {
     go_to_sleep();
   }
 }
@@ -158,10 +167,10 @@ void loop()
 ISR(TIMER3_COMPA_vect)
 {
   if (g_play_buff_pos < 0xfff0) {
-    OCR1A = pgm_read_byte_far((uint16_t)&g_pgm_play_buff[g_play_buff_pos]);
+    OCR1A = pgm_read_byte_far(g_pgm_play_buff + g_play_buff_pos);
     g_play_buff_pos++;
-    if (g_play_buff_pos == g_curr_sound_len) {
-      g_play_buff_pos = 0xfffe;
+    if (g_play_buff_pos >= g_curr_sound_len) {
+      g_play_buff_pos = 0xffff;
     }
   }
 }
@@ -169,12 +178,33 @@ ISR(TIMER3_COMPA_vect)
 
 ISR(INT0_vect)
 {
+  cli();
+
   wake_up();
 
-  cli();
   g_play_buff_pos = 0;
-  g_pgm_play_buff = sound0;
-  g_curr_sound_len = sound0_len;
+
+  switch (g_sound_index) {
+    case 0:
+      g_pgm_play_buff = sound0;
+      g_curr_sound_len = sound0_len;
+      break;
+    case 1:
+      g_pgm_play_buff = sound0 + sound0_len;
+      g_curr_sound_len = sound1_len;
+      break;
+    case 2:
+      g_pgm_play_buff = sound0 + sound0_len + sound1_len;
+      g_curr_sound_len = sound2_len;
+      break;
+    case 3:
+      g_pgm_play_buff = sound0 + sound0_len + sound1_len + sound2_len;
+      g_curr_sound_len = sound3_len;
+      break;
+  }
+
+  //g_sound_index = ((g_sound_index+1) & 0x03);
+
   sei();
 }
 
