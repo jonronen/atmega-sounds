@@ -32,7 +32,6 @@ static void setup();
 static void loop();
 static void go_to_sleep();
 
-static unsigned char g_sound_index;
 
 int main()
 {
@@ -118,8 +117,6 @@ static void setup()
   dummy = sound1[0];
   dummy = sound2[0];
   dummy = sound3[0];
-
-  g_sound_index = 0;
 }
 
 
@@ -184,26 +181,50 @@ ISR(INT0_vect)
 
   g_play_buff_pos = 0;
 
-  switch (g_sound_index) {
-    case 0:
-      g_pgm_play_buff = sound0;
-      g_curr_sound_len = sound0_len;
-      break;
-    case 1:
-      g_pgm_play_buff = sound0 + sound0_len;
-      g_curr_sound_len = sound1_len;
-      break;
-    case 2:
-      g_pgm_play_buff = sound0 + sound0_len + sound1_len;
-      g_curr_sound_len = sound2_len;
-      break;
-    case 3:
-      g_pgm_play_buff = sound0 + sound0_len + sound1_len + sound2_len;
-      g_curr_sound_len = sound3_len;
-      break;
-  }
+  g_pgm_play_buff = sound0;
+  g_curr_sound_len = sound0_len;
 
-  //g_sound_index = ((g_sound_index+1) & 0x03);
+  sei();
+}
+
+ISR(INT1_vect)
+{
+  cli();
+
+  wake_up();
+
+  g_play_buff_pos = 0;
+
+  g_pgm_play_buff = sound1;
+  g_curr_sound_len = sound1_len;
+
+  sei();
+}
+
+ISR(INT2_vect)
+{
+  cli();
+
+  wake_up();
+
+  g_play_buff_pos = 0;
+
+  g_pgm_play_buff = sound2;
+  g_curr_sound_len = sound2_len;
+
+  sei();
+}
+
+ISR(INT3_vect)
+{
+  cli();
+
+  wake_up();
+
+  g_play_buff_pos = 0;
+
+  g_pgm_play_buff = sound3;
+  g_curr_sound_len = sound3_len;
 
   sei();
 }
