@@ -6,8 +6,14 @@ import sys
 WAV_HEADER_SIZE = 0x2c
 
 
-if len(sys.argv) < 2:
-    print "Usage: %s WAV_FILE" % sys.argv[0]
+if len(sys.argv) < 3:
+    print "Usage: %s WAV_FILE INDEX" % sys.argv[0]
+    sys.exit()
+
+try:
+    ind = int(sys.argv[2])
+except ValueError:
+    print "INDEX must be a number (not %s)" % sys.argv[2]
     sys.exit()
 
 f = open(sys.argv[1], "rb")
@@ -21,10 +27,10 @@ g.write("#undef PROGMEM\n")
 g.write("#define PROGMEM __attribute__((section(\".progmem.data\")))\n")
 g.write("#endif\n")
 g.write("\n")
-g.write("extern const PROGMEM unsigned char sound0[];\n")
-g.write("extern const uint16_t sound0_len;");
+g.write("extern const PROGMEM unsigned char sound%d[];\n" % ind)
+g.write("extern const uint16_t sound%d_len;" % ind)
 g.write("\n")
-g.write("const unsigned char sound0[] PROGMEM = {")
+g.write("const unsigned char sound%d[] PROGMEM = {" % ind)
 
 
 wav_data = f.read()
@@ -38,7 +44,7 @@ for i in range(len(wav_data)):
 
 g.write("\n};\n")
 
-g.write("const uint16_t sound0_len = %d;\n" % len(wav_data))
+g.write("const uint16_t sound%d_len = sizeof(sound%d);\n" % (ind,ind))
 
 g.close()
 
