@@ -10,11 +10,30 @@
 #endif
 
 
+#define GET_FAR_ADDRESS(var)                        \
+({                                                  \
+    uint_farptr_t tmp;                              \
+                                                    \
+    __asm__ __volatile__(                           \
+                                                    \
+            "ldi    %A0, lo8(%1)"           "\n\t"  \
+            "ldi    %B0, hi8(%1)"           "\n\t"  \
+            "ldi    %C0, hh8(%1)"           "\n\t"  \
+            "clr    %D0"                    "\n\t"  \
+        :                                           \
+            "=d" (tmp)                              \
+        :                                           \
+            "p"  (&(var))                           \
+    );                                              \
+    tmp;                                            \
+})
+
+
 #define SOUND_FREQ 16000
 
 
-static uint32_t g_curr_sound_len;
-static uint32_t g_pgm_play_buff;
+volatile uint32_t g_curr_sound_len;
+volatile uint32_t g_pgm_play_buff;
 volatile uint32_t g_play_buff_pos;
 
 
@@ -45,8 +64,6 @@ int main()
 
 static void sound_setup()
 {
-  cli();
-  
   g_play_buff_pos = 0xffff;
 
   DDRB = 0xff; // set all port B pins as outputs
@@ -94,14 +111,14 @@ static void sound_setup()
   // OCR3A is a 16-bit register, so we have to do this with
   // interrupts disabled to be safe.
   OCR3A = (F_CPU / SOUND_FREQ);    // 8e6 / 16000 for atmega128
-  
-  sei();
 }
 
 
 static void setup()
 {
   volatile unsigned char dummy;
+
+  cli();
 
   sound_setup();
 
@@ -117,6 +134,8 @@ static void setup()
   dummy = sound1[0];
   dummy = sound2[0];
   dummy = sound3[0];
+
+  sei();
 }
 
 
@@ -181,7 +200,7 @@ ISR(INT0_vect)
 
   g_play_buff_pos = 0;
 
-  g_pgm_play_buff = sound0;
+  g_pgm_play_buff = GET_FAR_ADDRESS(sound0);
   g_curr_sound_len = sound0_len;
 
   sei();
@@ -195,7 +214,7 @@ ISR(INT1_vect)
 
   g_play_buff_pos = 0;
 
-  g_pgm_play_buff = sound1;
+  g_pgm_play_buff = GET_FAR_ADDRESS(sound1);
   g_curr_sound_len = sound1_len;
 
   sei();
@@ -209,7 +228,7 @@ ISR(INT2_vect)
 
   g_play_buff_pos = 0;
 
-  g_pgm_play_buff = sound2;
+  g_pgm_play_buff = GET_FAR_ADDRESS(sound2);
   g_curr_sound_len = sound2_len;
 
   sei();
@@ -223,7 +242,7 @@ ISR(INT3_vect)
 
   g_play_buff_pos = 0;
 
-  g_pgm_play_buff = sound3;
+  g_pgm_play_buff = GET_FAR_ADDRESS(sound3);
   g_curr_sound_len = sound3_len;
 
   sei();
