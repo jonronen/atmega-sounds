@@ -2,11 +2,12 @@
 #include <avr/pgmspace.h>
 #include <avr/io.h>
 #include <avr/sleep.h>
+#include <avr/cpufunc.h>
 
 
-#ifdef PROGMEM 
-#undef PROGMEM 
-#define PROGMEM __attribute__((section(".progmem.data"))) 
+#ifdef PROGMEM
+#undef PROGMEM
+#define PROGMEM __attribute__((section(".progmem.data")))
 #endif
 
 
@@ -55,7 +56,7 @@ static void go_to_sleep();
 int main()
 {
   setup();
-  
+
   while (1) {
     loop();
   }
@@ -67,15 +68,15 @@ static void sound_setup()
   g_play_buff_pos = 0xffff;
 
   DDRB = 0xff; // set all port B pins as outputs
-  
+
   // Set up Timer 0 to do pulse width modulation on the speaker
   // pin.
-  
+
   /*
   // Use internal clock
   ASSR &= ~(_BV(AS0));
   */
-  
+
   // disable all timer interrupts
   TIMSK = 0;
   ETIMSK = 0;
@@ -85,28 +86,28 @@ static void sound_setup()
   TCCR1A &= ~_BV(WGM11);
   TCCR1B |= _BV(WGM12);
   TCCR1B &= ~_BV(WGM13);
-  
+
   // Do non-inverting PWM on pin OC1A
   TCCR1A = (TCCR1A | _BV(COM1A1)) & ~_BV(COM1A0);
   TCCR1A &= ~(_BV(COM1B1) | _BV(COM1B0));
-  
+
   // No prescaler
   TCCR1B = (TCCR1B & ~(_BV(CS12) | _BV(CS11))) | _BV(CS10);
-  
+
   // Set initial pulse width to the first sample.
   OCR1A = 0;
-  
-  
+
+
   // Set up Timer 1 to send a sample every interrupt.
-  
+
   // Set CTC mode (Clear Timer on Compare Match)
   // Have to set OCR3A *after*, otherwise it gets reset to 0!
   TCCR3B = (TCCR3B & ~_BV(WGM33)) | _BV(WGM32);
   TCCR3A = TCCR3A & ~(_BV(WGM31) | _BV(WGM30));
-  
+
   // No prescaler
   TCCR3B = (TCCR3B & ~(_BV(CS32) | _BV(CS31))) | _BV(CS30);
-  
+
   // Set the compare register (OCR3A).
   // OCR3A is a 16-bit register, so we have to do this with
   // interrupts disabled to be safe.
@@ -116,24 +117,19 @@ static void sound_setup()
 
 static void setup()
 {
-  volatile unsigned char dummy;
-
+  // disable interrupts to allow proper setup
   cli();
 
   sound_setup();
 
   /* set the pins as inputs (don't pull them up) */
+  PORTD = 0;
   DDRD = 0; // input
 
-  /* set port D pins 0-3 to trigger interrupts */
-  EICRA = 0xff;
-  EIMSK = 0x0f;
-
-  /* use some references to sound0/1/2/3 to keep them in the binary */
-  dummy = sound0[0];
-  dummy = sound1[0];
-  dummy = sound2[0];
-  dummy = sound3[0];
+  // set port D pins 0-3 to trigger interrupts
+  EICRA = 0xff; // interrupts on rising edge
+  EIFR = 0xff; // clear previous interrupts
+  EIMSK = 0x0f; // enable the interrupt sources
 
   sei();
 }
@@ -155,16 +151,20 @@ static void go_to_sleep()
   // set sleep mode to POWER DOWN mode
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
-  // go to sleep
+
+  // put the CPU to sleep
+
+  // sei() is a must, otherwise we won't wake up. atomicity is granted:
+  // interrupts won't be handled between the sei() instruction and the
+  // sleep_cpu() instruction
+  sei();
+
   sleep_cpu();
 }
 
 
 static void wake_up()
 {
-  // back from sleep
-  //sleep_disable();
-  
   sound_setup();
 
   // enable interrupt when TCNT3 == OCR3A
@@ -174,26 +174,53 @@ static void wake_up()
 
 void loop()
 {
+  // disable interrupts to atomically check the position
+  cli();
   if (g_play_buff_pos == 0xffff) {
-    go_to_sleep();
+    go_to_sleep(); // NOTE: interrupts will be enabled after this line
+    // back from sleep
+    sleep_disable();
   }
+  // if we're here then we've either woken up or we're still playing a sound.
+  // either way, we should enable interrupts back again in order to handle the
+  // timer interrupt and the external trigger
+  sei();
+  // add a few NOPs to allow the CPU to receive interrupts. there's an
+  // atomicity thing that prevents the CPU from taking interrupts immediately
+  // after sei() instructions
+  _NOP();
+  _NOP();
 }
 
 
 ISR(TIMER3_COMPA_vect)
 {
+  // disable interrupts to enable proper interrupt handling
+  cli();
+
   if (g_play_buff_pos < 0xfff0) {
     OCR1A = pgm_read_byte_far(g_pgm_play_buff + g_play_buff_pos);
     g_play_buff_pos++;
     if (g_play_buff_pos >= g_curr_sound_len) {
       g_play_buff_pos = 0xffff;
+
+      // now we can reenable external interrupts
+
+      // clear the pending signals first
+      EIFR = 0xff;
+      // allow external interrupts to wake us up
+      EIMSK = 0x0f;
     }
   }
+
+  // enable interrupts back again
+  sei();
 }
 
 
 ISR(INT0_vect)
 {
+  // disable interrupts to enable proper interrupt handling
   cli();
 
   wake_up();
@@ -203,11 +230,16 @@ ISR(INT0_vect)
   g_pgm_play_buff = GET_FAR_ADDRESS(sound0);
   g_curr_sound_len = sound0_len;
 
+  // disable external interrupts until we finish playing the sound
+  EIMSK = 0;
+
+  // enable interrupts back again
   sei();
 }
 
 ISR(INT1_vect)
 {
+  // disable interrupts to enable proper interrupt handling
   cli();
 
   wake_up();
@@ -217,11 +249,16 @@ ISR(INT1_vect)
   g_pgm_play_buff = GET_FAR_ADDRESS(sound1);
   g_curr_sound_len = sound1_len;
 
+  // disable external interrupts until we finish playing the sound
+  EIMSK = 0;
+
+  // enable interrupts back again
   sei();
 }
 
 ISR(INT2_vect)
 {
+  // disable interrupts to enable proper interrupt handling
   cli();
 
   wake_up();
@@ -231,11 +268,16 @@ ISR(INT2_vect)
   g_pgm_play_buff = GET_FAR_ADDRESS(sound2);
   g_curr_sound_len = sound2_len;
 
+  // disable external interrupts until we finish playing the sound
+  EIMSK = 0;
+
+  // enable interrupts back again
   sei();
 }
 
 ISR(INT3_vect)
 {
+  // disable interrupts to enable proper interrupt handling
   cli();
 
   wake_up();
@@ -245,6 +287,10 @@ ISR(INT3_vect)
   g_pgm_play_buff = GET_FAR_ADDRESS(sound3);
   g_curr_sound_len = sound3_len;
 
+  // disable external interrupts until we finish playing the sound
+  EIMSK = 0;
+
+  // enable interrupts back again
   sei();
 }
 
