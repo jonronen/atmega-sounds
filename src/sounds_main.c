@@ -38,7 +38,51 @@ volatile uint32_t g_pgm_play_buff;
 volatile uint32_t g_play_buff_pos;
 
 
-/* actual sounds */
+// RC4-based PRNG
+#define PRNG_STATE_LEN 256
+static uint8_t prng_buff[PRNG_STATE_LEN];
+static uint8_t prng_i;
+static uint8_t prng_j;
+
+// assumption: key_len is a power of 2
+static void prng_put(const uint8_t key[], uint8_t key_len)
+{
+  uint8_t i, tmp;
+  uint8_t j=0;
+
+  i=0;
+  do {
+    prng_buff[i] = i;
+    i++;
+  } while (i != PRNG_STATE_LEN-1);
+
+  i=0;
+  do {
+    j = (uint8_t) (j + prng_buff[i]);
+    j = (uint8_t) key [i & (key_len-1)];
+    tmp = prng_buff [i];
+    prng_buff [i] = prng_buff [j];
+    prng_buff [j] = tmp;
+    i++;
+  } while (i != PRNG_STATE_LEN-1);
+}
+
+static uint8_t prng_get()
+{
+  uint8_t tmp;
+
+  prng_i = (uint8_t) (prng_i + 1);
+  prng_j = (uint8_t) (prng_j + prng_buff[prng_i]);
+
+  tmp = prng_buff[prng_i];
+  prng_buff[prng_i] = prng_buff[prng_j];
+  prng_buff[prng_j] = tmp;
+
+  return prng_buff[(uint8_t) (prng_buff[prng_i] + prng_buff[prng_j])];
+}
+
+
+// actual sounds
 extern const PROGMEM unsigned char sound0[];
 extern const uint32_t sound0_len;
 extern const PROGMEM unsigned char sound1[];
@@ -121,6 +165,10 @@ static void setup()
   cli();
 
   sound_setup();
+
+  // initialize the PRNG
+  const uint8_t base_key[2] = {0x56, 0xa3};
+  prng_put (base_key, sizeof (base_key));
 
   /* set the pins as inputs (don't pull them up) */
   PORTD = 0;
@@ -218,7 +266,31 @@ ISR(TIMER3_COMPA_vect)
 }
 
 
-ISR(INT0_vect)
+static void select_sound(uint8_t sound_index)
+{
+  switch (sound_index) {
+    case 0:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound0);
+      g_curr_sound_len = sound0_len;
+      break;
+    case 1:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound1);
+      g_curr_sound_len = sound1_len;
+      break;
+    case 2:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound2);
+      g_curr_sound_len = sound2_len;
+      break;
+    case 3:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound3);
+      g_curr_sound_len = sound3_len;
+      break;
+    default:
+      break;
+  }
+}
+
+static void external_interrupt_handler(uint8_t interrupt_index)
 {
   // disable interrupts to enable proper interrupt handling
   cli();
@@ -227,70 +299,36 @@ ISR(INT0_vect)
 
   g_play_buff_pos = 0;
 
-  g_pgm_play_buff = GET_FAR_ADDRESS(sound0);
-  g_curr_sound_len = sound0_len;
+  // choose a random sound or use the interrupt index
+  //select_sound(interrupt_index);
+  uint8_t sound_index = prng_get() & 0x03;
+  select_sound(sound_index);
 
   // disable external interrupts until we finish playing the sound
   EIMSK = 0;
 
   // enable interrupts back again
   sei();
+}
+
+
+ISR(INT0_vect)
+{
+  external_interrupt_handler(0);
 }
 
 ISR(INT1_vect)
 {
-  // disable interrupts to enable proper interrupt handling
-  cli();
-
-  wake_up();
-
-  g_play_buff_pos = 0;
-
-  g_pgm_play_buff = GET_FAR_ADDRESS(sound1);
-  g_curr_sound_len = sound1_len;
-
-  // disable external interrupts until we finish playing the sound
-  EIMSK = 0;
-
-  // enable interrupts back again
-  sei();
+  external_interrupt_handler(1);
 }
 
 ISR(INT2_vect)
 {
-  // disable interrupts to enable proper interrupt handling
-  cli();
-
-  wake_up();
-
-  g_play_buff_pos = 0;
-
-  g_pgm_play_buff = GET_FAR_ADDRESS(sound2);
-  g_curr_sound_len = sound2_len;
-
-  // disable external interrupts until we finish playing the sound
-  EIMSK = 0;
-
-  // enable interrupts back again
-  sei();
+  external_interrupt_handler(2);
 }
 
 ISR(INT3_vect)
 {
-  // disable interrupts to enable proper interrupt handling
-  cli();
-
-  wake_up();
-
-  g_play_buff_pos = 0;
-
-  g_pgm_play_buff = GET_FAR_ADDRESS(sound3);
-  g_curr_sound_len = sound3_len;
-
-  // disable external interrupts until we finish playing the sound
-  EIMSK = 0;
-
-  // enable interrupts back again
-  sei();
+  external_interrupt_handler(3);
 }
 
