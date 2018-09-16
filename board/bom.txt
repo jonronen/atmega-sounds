@@ -1,0 +1,12 @@
+U1 - atmega128, TQFP-64
+Q1 - N-channel MOSFET, ZXMN2A01F or BSS123L or similar, SOT23
+R1,R4,R5,R6,R7 - 10K resistor, 0805
+R2 - 0R/4R/8R resistor, 0805 (optional, short-circuit otherwise)
+R3 - 100R resistor, 0805
+C1,C2,C7 - 100nF, 0805
+C4,C5 - 10uF, 0805
+ISP1 - 2x3 pin header, 2.54mm pitch
+SW1 - 1x5 pin header, 2.54mm pitch
+SPK1 - 1x2 pin header, 2.54mm pitch
+BATT1 - 1x2 pin header, 2.54mm pitch
+
