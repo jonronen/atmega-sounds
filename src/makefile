@@ -1,37 +1,46 @@
 MCU ?= atmega128
 
-ARDUINO_FILES ?= /home/jon/Downloads/arduino-1.8.5
-ARDUINO_SRCS = $(ARDUINO_FILES)/hardware/arduino/avr/cores/arduino
+ARDUINO_FILES ?= /home/jon/Downloads/arduino-1.8.16/hardware
+ARDUINO_SRCS = $(ARDUINO_FILES)/tools/avr/avr/include
 
 ARDUINO_PORT ?= /dev/ttyACM0
 
 
-GPP_FLAGS := -c -g -O2 -Wall -fno-exceptions -ffunction-sections -fdata-sections -mmcu=$(MCU) -DF_CPU=8000000L -DARDUINO=101 -I$(ARDUINO_SRCS) -I$(ARDUINO_FILES)/hardware/arduino/avr/variants/standard
+GPP_FLAGS := -c -g -O2 -Wall -fno-exceptions -ffunction-sections -fdata-sections -mmcu=$(MCU) -DF_CPU=8000000L -DARDUINO=101 -I $(ARDUINO_SRCS)
 
 
 sounds.hex: sounds.elf
 	avr-objcopy -O ihex -R .eeprom sounds.elf sounds.hex
 
-sounds.elf: sounds_main.o sound0.o sound1.o sound2.o sound3.o
-	avr-g++ -O2 -mmcu=$(MCU) -o sounds.elf sounds_main.o sound0.o sound1.o sound2.o sound3.o -lm
+sounds.elf: sounds_main.o sound0.o sound1.o sound2.o sound3.o sound4.o sound5.o sound6.o
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ -O2 -mmcu=$(MCU) -o sounds.elf sounds_main.o sound0.o sound1.o sound2.o sound3.o sound4.o sound5.o sound6.o -lm
 
 sound0.o: sound0.c
-	avr-g++ $(GPP_FLAGS) sound0.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound0.c
 
 sound1.o: sound1.c
-	avr-g++ $(GPP_FLAGS) sound1.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound1.c
 
 sound2.o: sound2.c
-	avr-g++ $(GPP_FLAGS) sound2.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound2.c
 
 sound3.o: sound3.c
-	avr-g++ $(GPP_FLAGS) sound3.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound3.c
+
+sound4.o: sound4.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound4.c
+
+sound5.o: sound5.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound5.c
+
+sound6.o: sound6.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound6.c
 
 sounds_main.o: sounds_main.c
-	avr-gcc $(GPP_FLAGS) sounds_main.c
+	$(ARDUINO_FILES)/tools/avr/bin/avr-gcc $(GPP_FLAGS) sounds_main.c
 
 upload: sounds.hex
-	avrdude -C$(ARDUINO_FILES)/hardware/tools/avr/etc/avrdude.conf -v -p$(MCU) -cstk500v1 -P$(ARDUINO_PORT) -b19200 -Uflash:w:sounds.hex:i
+	$(ARDUINO_FILES)/tools/avr/bin/avrdude -C$(ARDUINO_FILES)/tools/avr/etc/avrdude.conf -v -v -v -p$(MCU) -cstk500v1 -P$(ARDUINO_PORT) -b19200 -Uflash:w:sounds.hex:i
 
 clean:
 	rm -f *.o *.hex *.elf
