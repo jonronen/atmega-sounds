@@ -91,6 +91,12 @@ extern const PROGMEM unsigned char sound2[];
 extern const uint32_t sound2_len;
 extern const PROGMEM unsigned char sound3[];
 extern const uint32_t sound3_len;
+extern const PROGMEM unsigned char sound4[];
+extern const uint32_t sound4_len;
+extern const PROGMEM unsigned char sound5[];
+extern const uint32_t sound5_len;
+extern const PROGMEM unsigned char sound6[];
+extern const uint32_t sound6_len;
 
 static void setup();
 static void loop();
@@ -285,6 +291,18 @@ static void select_sound(uint8_t sound_index)
       g_pgm_play_buff = GET_FAR_ADDRESS(sound3);
       g_curr_sound_len = sound3_len;
       break;
+    case 4:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound4);
+      g_curr_sound_len = sound4_len;
+      break;
+    case 5:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound5);
+      g_curr_sound_len = sound5_len;
+      break;
+    case 6:
+      g_pgm_play_buff = GET_FAR_ADDRESS(sound6);
+      g_curr_sound_len = sound6_len;
+      break;
     default:
       break;
   }
@@ -292,6 +310,8 @@ static void select_sound(uint8_t sound_index)
 
 static void external_interrupt_handler(uint8_t interrupt_index)
 {
+  uint8_t rnd;
+
   // disable interrupts to enable proper interrupt handling
   cli();
 
@@ -300,9 +320,37 @@ static void external_interrupt_handler(uint8_t interrupt_index)
   g_play_buff_pos = 0;
 
   // choose a random sound or use the interrupt index
-  //select_sound(interrupt_index);
-  uint8_t sound_index = prng_get() & 0x03;
-  select_sound(sound_index);
+  switch (interrupt_index) {
+    case 0:
+      // select a sound between 0 and 3
+      select_sound(prng_get() & 0x03);
+      break;
+    case 1:
+      // select sound number 4
+      select_sound(4);
+      break;
+    case 2:
+      // select a sound between 5 and 6
+      select_sound(5 + (prng_get() & 0x01));
+      break;
+    case 3:
+    default:
+      // select a random sound
+      rnd = prng_get();
+      switch ((rnd & 0x0c) >> 2) {
+        case 0:
+        case 1:
+          select_sound(rnd & 0x03);
+          break;
+        case 2:
+          select_sound(4);
+        case 3:
+        default:
+          select_sound(5 + (rnd & 0x01));
+          break;
+      }
+      break;
+  }
 
   // disable external interrupts until we finish playing the sound
   EIMSK = 0;
