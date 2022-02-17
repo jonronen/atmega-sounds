@@ -12,8 +12,8 @@ GPP_FLAGS := -c -g -O2 -Wall -fno-exceptions -ffunction-sections -fdata-sections
 sounds.hex: sounds.elf
 	avr-objcopy -O ihex -R .eeprom sounds.elf sounds.hex
 
-sounds.elf: sounds_main.o sound0.o sound1.o sound2.o sound3.o sound4.o sound5.o sound6.o
-	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ -O2 -mmcu=$(MCU) -o sounds.elf sounds_main.o sound0.o sound1.o sound2.o sound3.o sound4.o sound5.o sound6.o -lm
+sounds.elf: sounds_main.o sound0.o sound1.o sound2.o sound3.o
+	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ -O2 -mmcu=$(MCU) -o sounds.elf sounds_main.o sound0.o sound1.o sound2.o sound3.o -lm
 
 sound0.o: sound0.c
 	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound0.c
@@ -26,15 +26,6 @@ sound2.o: sound2.c
 
 sound3.o: sound3.c
 	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound3.c
-
-sound4.o: sound4.c
-	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound4.c
-
-sound5.o: sound5.c
-	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound5.c
-
-sound6.o: sound6.c
-	$(ARDUINO_FILES)/tools/avr/bin/avr-g++ $(GPP_FLAGS) sound6.c
 
 sounds_main.o: sounds_main.c
 	$(ARDUINO_FILES)/tools/avr/bin/avr-gcc $(GPP_FLAGS) sounds_main.c
