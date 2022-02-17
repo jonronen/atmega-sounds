@@ -308,19 +308,12 @@ static void select_sound(uint8_t sound_index)
   }
 }
 
-static void external_interrupt_handler(uint8_t interrupt_index)
+static void choose_random_sound(uint8_t button_index)
 {
   uint8_t rnd;
 
-  // disable interrupts to enable proper interrupt handling
-  cli();
-
-  wake_up();
-
-  g_play_buff_pos = 0;
-
   // choose a random sound or use the interrupt index
-  switch (interrupt_index) {
+  switch (button_index) {
     case 0:
       // select a sound between 0 and 3
       select_sound(prng_get() & 0x03);
@@ -351,6 +344,18 @@ static void external_interrupt_handler(uint8_t interrupt_index)
       }
       break;
   }
+}
+
+static void external_interrupt_handler(uint8_t interrupt_index)
+{
+  // disable interrupts to enable proper interrupt handling
+  cli();
+
+  wake_up();
+
+  g_play_buff_pos = 0;
+
+  choose_random_sound(interrupt_index);
 
   // disable external interrupts until we finish playing the sound
   EIMSK = 0;
