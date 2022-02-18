@@ -33,6 +33,9 @@ sounds_main.o: sounds_main.c
 upload: sounds.hex
 	$(ARDUINO_FILES)/tools/avr/bin/avrdude -C$(ARDUINO_FILES)/tools/avr/etc/avrdude.conf -v -v -v -p$(MCU) -cstk500v1 -P$(ARDUINO_PORT) -b19200 -Uflash:w:sounds.hex:i
 
+fuses:
+	$(ARDUINO_FILES)/tools/avr/bin/avrdude -C$(ARDUINO_FILES)/tools/avr/etc/avrdude.conf -v -v -v -p$(MCU) -cstk500v1 -P$(ARDUINO_PORT) -b19200 -U lfuse:w:0xe4:m -U hfuse:w:0xd7:m -U efuse:w:0xff:m
+
 clean:
 	rm -f *.o *.hex *.elf
 
