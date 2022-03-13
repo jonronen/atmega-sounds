@@ -326,13 +326,17 @@ static void external_interrupt_handler(uint8_t interrupt_index)
   // disable interrupts to enable proper interrupt handling
   cli();
 
-  wake_up();
+  // only allow selecting a new sound with a selection frequency of less than
+  // 10 Hz
+  if (g_play_buff_pos > 1600) {
+    wake_up();
 
-  g_play_buff_pos = 0;
+    g_play_buff_pos = 0;
 
-  if (0)
-    choose_random_sound(interrupt_index);
-  select_sound(interrupt_index);
+    if (0)
+      choose_random_sound(interrupt_index);
+    select_sound(interrupt_index);
+  }
 
   // enable interrupts back again
   sei();
