@@ -251,13 +251,6 @@ ISR(TIMER3_COMPA_vect)
     g_play_buff_pos++;
     if (g_play_buff_pos >= g_curr_sound_len) {
       g_play_buff_pos = 0xffff;
-
-      // now we can reenable external interrupts
-
-      // clear the pending signals first
-      EIFR = 0xff;
-      // allow external interrupts to wake us up
-      EIMSK = 0x0f;
     }
   }
 
@@ -341,9 +334,6 @@ static void external_interrupt_handler(uint8_t interrupt_index)
     choose_random_sound(interrupt_index);
   select_sound(interrupt_index);
 
-  // disable external interrupts until we finish playing the sound
-  EIMSK = 0;
-
   // enable interrupts back again
   sei();
 }
@@ -351,21 +341,41 @@ static void external_interrupt_handler(uint8_t interrupt_index)
 
 ISR(INT0_vect)
 {
-  external_interrupt_handler(0);
+  // clear the interrupt
+  EIFR = 0x01;
+  // to avoid unnecessary interrupts, only handle the interrupt in case the
+  // button was actually pressed
+  if (PIND & 0x01)
+    external_interrupt_handler(0);
 }
 
 ISR(INT1_vect)
 {
-  external_interrupt_handler(1);
+  // clear the interrupt
+  EIFR = 0x02;
+  // to avoid unnecessary interrupts, only handle the interrupt in case the
+  // button was actually pressed
+  if (PIND & 0x02)
+    external_interrupt_handler(1);
 }
 
 ISR(INT2_vect)
 {
-  external_interrupt_handler(2);
+  // clear the interrupt
+  EIFR = 0x04;
+  // to avoid unnecessary interrupts, only handle the interrupt in case the
+  // button was actually pressed
+  if (PIND & 0x04)
+    external_interrupt_handler(2);
 }
 
 ISR(INT3_vect)
 {
-  external_interrupt_handler(3);
+  // clear the interrupt
+  EIFR = 0x08;
+  // to avoid unnecessary interrupts, only handle the interrupt in case the
+  // button was actually pressed
+  if (PIND & 0x08)
+    external_interrupt_handler(3);
 }
 
